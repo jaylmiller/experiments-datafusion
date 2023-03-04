@@ -1,5 +1,5 @@
 [package]
-name = "bench-arrow-sort"
+name = "inspect-arrow-sort"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,7 +9,7 @@ edition = "2021"
 clap = { version = "4.0.32", features = ["derive"] }
 datafusion = "19.0.0"
 tokio = "1.26.0"
-rand_distr = "0.4.3"
 hex = "0.4.3"
 lazy_static = "1.4.0"
 rand = "0.8.5"
+plotters = "0.3.4"

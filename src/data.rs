@@ -1,4 +1,4 @@
-//! Benchmark data generation lifted from datafusion sort benchmark
+//! Data generation code lifted from datafusion sort benchmark
 
 use std::sync::Arc;
 
@@ -9,9 +9,27 @@ use datafusion::arrow::{
     record_batch::RecordBatch,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
-const NUM_STREAMS: u64 = 8;
+
+#[derive(Debug, Clone, clap::ValueEnum)]
+pub enum Case {
+    Utf8Tuple,
+    MixedTuple,
+    DictionaryTuple,
+    MixedDictionaryTuple,
+}
+impl Case {
+    pub fn generate_batch(&self, size: usize) -> RecordBatch {
+        match self {
+            Case::Utf8Tuple => utf8_tuple_streams(size),
+            Case::MixedTuple => mixed_tuple_streams(size),
+            Case::DictionaryTuple => dictionary_tuple_streams(size),
+            Case::MixedDictionaryTuple => mixed_dictionary_tuple_streams(size),
+        }
+    }
+}
+
 /// Create streams of random low cardinality utf8 values
-pub fn utf8_low_cardinality_streams(size: usize) -> Vec<Vec<RecordBatch>> {
+pub fn utf8_low_cardinality_streams(size: usize) -> RecordBatch {
     let array: StringArray = DataGenerator::new(size)
         .utf8_low_cardinality_values()
         .into_iter()
@@ -19,11 +37,11 @@ pub fn utf8_low_cardinality_streams(size: usize) -> Vec<Vec<RecordBatch>> {
 
     let batch = RecordBatch::try_from_iter(vec![("utf_low", Arc::new(array) as _)]).unwrap();
 
-    split_batch(batch)
+    batch
 }
 
 /// Create streams of high  cardinality (~ no duplicates) utf8 values
-pub fn utf8_high_cardinality_streams(size: usize) -> Vec<Vec<RecordBatch>> {
+pub fn utf8_high_cardinality_streams(size: usize) -> RecordBatch {
     let array: StringArray = DataGenerator::new(size)
         .utf8_high_cardinality_values()
         .into_iter()
@@ -31,11 +49,11 @@ pub fn utf8_high_cardinality_streams(size: usize) -> Vec<Vec<RecordBatch>> {
 
     let batch = RecordBatch::try_from_iter(vec![("utf_high", Arc::new(array) as _)]).unwrap();
 
-    split_batch(batch)
+    batch
 }
 
 /// Create a batch of (utf8_low, utf8_low, utf8_high)
-pub fn utf8_tuple_streams(size: usize) -> Vec<Vec<RecordBatch>> {
+pub fn utf8_tuple_streams(size: usize) -> RecordBatch {
     let mut gen = DataGenerator::new(size);
 
     // need to sort by the combined key, so combine them together
@@ -62,11 +80,11 @@ pub fn utf8_tuple_streams(size: usize) -> Vec<Vec<RecordBatch>> {
     ])
     .unwrap();
 
-    split_batch(batch)
+    batch
 }
 
 /// Create a batch of (f64, utf8_low, utf8_low, i64)
-pub fn mixed_tuple_streams(size: usize) -> Vec<Vec<RecordBatch>> {
+pub fn mixed_tuple_streams(size: usize) -> RecordBatch {
     let mut gen = DataGenerator::new(size);
 
     // need to sort by the combined key, so combine them together
@@ -88,30 +106,27 @@ pub fn mixed_tuple_streams(size: usize) -> Vec<Vec<RecordBatch>> {
     let utf8_low2: StringArray = utf8_low2.into_iter().collect();
     let i64_values: Int64Array = i64_values.into_iter().collect();
 
-    let batch = RecordBatch::try_from_iter(vec![
+    RecordBatch::try_from_iter(vec![
         ("f64", Arc::new(f64_values) as _),
         ("utf_low1", Arc::new(utf8_low1) as _),
         ("utf_low2", Arc::new(utf8_low2) as _),
         ("i64", Arc::new(i64_values) as _),
     ])
-    .unwrap();
-
-    split_batch(batch)
+    .unwrap()
 }
 
 /// Create a batch of (utf8_dict)
-pub fn dictionary_streams(size: usize) -> Vec<Vec<RecordBatch>> {
+pub fn dictionary_streams(size: usize) -> RecordBatch {
     let mut gen = DataGenerator::new(size);
     let values = gen.utf8_low_cardinality_values();
     let dictionary: DictionaryArray<Int32Type> = values.iter().map(Option::as_deref).collect();
 
     let batch = RecordBatch::try_from_iter(vec![("dict", Arc::new(dictionary) as _)]).unwrap();
-
-    split_batch(batch)
+    batch
 }
 
 /// Create a batch of (utf8_dict, utf8_dict, utf8_dict)
-pub fn dictionary_tuple_streams(size: usize) -> Vec<Vec<RecordBatch>> {
+pub fn dictionary_tuple_streams(size: usize) -> RecordBatch {
     let mut gen = DataGenerator::new(size);
     let mut tuples: Vec<_> = gen
         .utf8_low_cardinality_values()
@@ -128,18 +143,16 @@ pub fn dictionary_tuple_streams(size: usize) -> Vec<Vec<RecordBatch>> {
     let b: DictionaryArray<Int32Type> = b.iter().map(Option::as_deref).collect();
     let c: DictionaryArray<Int32Type> = c.iter().map(Option::as_deref).collect();
 
-    let batch = RecordBatch::try_from_iter(vec![
+    RecordBatch::try_from_iter(vec![
         ("a", Arc::new(a) as _),
         ("b", Arc::new(b) as _),
         ("c", Arc::new(c) as _),
     ])
-    .unwrap();
-
-    split_batch(batch)
+    .unwrap()
 }
 
 /// Create a batch of (utf8_dict, utf8_dict, utf8_dict, i64)
-pub fn mixed_dictionary_tuple_streams(size: usize) -> Vec<Vec<RecordBatch>> {
+pub fn mixed_dictionary_tuple_streams(size: usize) -> RecordBatch {
     let mut gen = DataGenerator::new(size);
     let mut tuples: Vec<_> = gen
         .utf8_low_cardinality_values()
@@ -159,15 +172,13 @@ pub fn mixed_dictionary_tuple_streams(size: usize) -> Vec<Vec<RecordBatch>> {
     let c: DictionaryArray<Int32Type> = c.iter().map(Option::as_deref).collect();
     let d: Int64Array = d.into_iter().collect();
 
-    let batch = RecordBatch::try_from_iter(vec![
+    RecordBatch::try_from_iter(vec![
         ("a", Arc::new(a) as _),
         ("b", Arc::new(b) as _),
         ("c", Arc::new(c) as _),
         ("d", Arc::new(d) as _),
     ])
-    .unwrap();
-
-    split_batch(batch)
+    .unwrap()
 }
 
 /// Encapsulates creating data for this test
@@ -231,17 +242,17 @@ impl DataGenerator {
 }
 
 /// Splits the `input_batch` randomly into `NUM_STREAMS` approximately evenly sorted streams
-fn split_batch(input_batch: RecordBatch) -> Vec<Vec<RecordBatch>> {
+fn split_batch(input_batch: RecordBatch, num_streams: u64) -> Vec<Vec<RecordBatch>> {
     // figure out which inputs go where
     let mut rng = StdRng::seed_from_u64(1337);
 
     // randomly assign rows to streams
     let stream_assignments = (0..input_batch.num_rows())
-        .map(|_| rng.gen_range(0..NUM_STREAMS))
+        .map(|_| rng.gen_range(0..num_streams))
         .collect();
 
     // split the inputs into streams
-    (0..NUM_STREAMS)
+    (0..num_streams)
         .map(|stream| {
             // make a "stream" of 1 record batch
             vec![take_columns(&input_batch, &stream_assignments, stream)]
