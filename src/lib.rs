@@ -1,17 +1,20 @@
 use datafusion::{
     arrow::{
         array::{ArrayRef, UInt32Array},
-        compute::{lexsort_to_indices, take, SortColumn, TakeOptions},
-        datatypes::SchemaRef,
+        compute::{lexsort_to_indices, take, SortColumn, SortOptions, TakeOptions},
+        datatypes::{Schema, SchemaRef},
         error::ArrowError,
         record_batch::RecordBatch,
         row::{Row, RowConverter, SortField},
     },
     error::Result,
     physical_expr::PhysicalSortExpr,
+    physical_plan::expressions::col,
 };
-
-fn sort_batch(
+mod data;
+pub use data::*;
+// Sort batch code lifted from SortExec row format PR (https://github.com/apache/arrow-datafusion/pull/5292)
+pub fn sort_batch(
     batch: RecordBatch,
     schema: SchemaRef,
     expr: &[PhysicalSortExpr],
@@ -63,4 +66,16 @@ fn sort_batch(
             .collect::<Result<Vec<ArrayRef>, ArrowError>>()?,
     )?;
     Ok(sorted_batch)
+}
+
+/// Make sort exprs for each column in `schema`
+pub fn make_sort_exprs(schema: &Schema) -> Vec<PhysicalSortExpr> {
+    schema
+        .fields()
+        .iter()
+        .map(|f| PhysicalSortExpr {
+            expr: col(f.name(), schema).unwrap(),
+            options: SortOptions::default(),
+        })
+        .collect()
 }
